@@ -192,3 +192,120 @@ _몇몇 개발자들은 PasswordEncoder id 와 같은 storage format 이 유출�
  
  
 # 6. Password Encoding
+위의 DelegatingPasswordEncoder 의 마지막 예시코드를 보면,  
+생성자에 idForEncode 를 넘겨주면서 어떤 PasswordEncoder 를 사용해서  
+Password 를 인코딩할 지 결정했다.  
+
+우리가 위에서 만들었던 DelegatingPasswordEncoder 는 idForEncode 에 값을 bcrypt 로  
+넣었기 때문에 Password 는 BCryptPasswordEncoder 가 인코딩할 것이며,  
+인코딩되어 저장되는 Password 앞에 {bcrypt} 라는 prefix 가 붙을 것 이다. 아래처럼 말이다.
+
+```
+{bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
+```
+
+# 7. Password Matching
+저장된 Password 와의 일치 여부는 저장된 Password 의 Prefix({id}) 와 생성자를 통해 주입받은  
+PasswordEncoder 의 id 를 기반으로 수행이 된다. 위의 Password Storage Format 의 예시를 보면  
+어떤 형태로 저장이 되는지 알 수 있다.  
+
+기본적으로 Password 와 올바르지 않은 Encoding id 를 사용하여(Encoding id 이 null 인 경우도 포함)  
+matches(CharSequence, String) 함수를 호출하면 IllegalArgumentException 을 발생시킨다.  
+기본적인 동작은 DelegatingPasswordEncoder.setDefaultPasswordEncoderForMatches(PasswordEncoder)  
+메서드를 통해서 정의가 가능하다.  
+
+Encoding id 를 통해서 어떤 Password Encoding 이던 할 수 있지만, 가장 최신의 Encoding 방식으로  
+인코딩 해야한다. 이것은 암호화랑 달리 Password 해시 값들이 일반 평분으로 쉽게 해독할 수 없도록 설계되었기  
+때문에 중요하다.  
+
+비밀번호를 평문으로 해독할 방법이 없기때문 Password 를 마이그레이션 하기 어렵다.  
+하지만 NoOpPasswordEncoder 를 사용하는 경우엔 간단하다, 그리고 시작환경을  
+간단하게 만들기 위해 NoOpPasswordEncoder 를 기본적으로 사용하도록 포함했다.  
+
+  
+
+  
+
+# 8. Getting Started Experience
+쉽게 테스트를 해봅시다.
+
+* withDefaultPasswordEncoder Example  
+```
+User user = User.withDefaultPasswordEncoder()
+  .username("user")
+  .password("password")
+  .roles("user")
+  .build();
+System.out.println(user.getPassword());
+// {bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
+```    
+
+만약 여러 유저를 만들고 싶다면 아래처럼 빌더패턴을 재사용하면 된다.
+
+```
+UserBuilder users = User.withDefaultPasswordEncoder();
+User user = users
+  .username("user")
+  .password("password")
+  .roles("USER")
+  .build();
+User admin = users
+  .username("admin")
+  .password("password")
+  .roles("USER","ADMIN")
+  .build();
+```
+
+이렇게 작성한 것은 Password 가 해시되어 저장은 되지만, 여전히 Password 가 메모리와  
+컴파일된 소스코드 안에 녹아있다. 그러므로 이렇게 작성하는 것은 운영환경에 적합하지 않다.  
+운영환경에 적용하기 위해서 아래의 내용들을 살펴보자.  
+
+# 9. Encode with Spring Boot CLI
+Password 를 인코딩하는 가장 쉬운 방법은 Spring Boot CLI 를 사용하는 것 이다.  
+아래의 코드를 실행하면 "password" 라는 Password 가 DelegatingPasswordEncoder 를 통해
+인코딩 된 결과를 보여준다.
+
+* Spring Boot CLI encodepassword Example
+```
+spring encodepassword password
+{bcrypt}$2a$10$X5wFBtLrL/kHcmrOGGTrGufsBX8CJ0WpQpF3pgeuxBB/H73BK1DW6
+```
+DelegatingPasswordEncoder 를 실행햇는데 {bcrypt} 로 된 것은 위의 글을 자세히 읽어보자  
+어떤 알고리즘이 기본 알고리즘이고, 기본 PasswordEncoder 를 어떻게 커스텀 할 수 있는지 말이다.
+
+*  Troubleshooting  
+만약에 저장된 Password 가 올바른 id 없이 저장이 되었다면 아래와 같은 에러를 만나게 된다.  
+(올바른 ID 의 예시는 위의 Password Storage Format 에 나와있다.)  
+```
+java.lang.IllegalArgumentException: There is no PasswordEncoder mapped for the id "null"
+    at org.springframework.security.crypto.password.DelegatingPasswordEncoder$UnmappedIdPasswordEncoder.matches(DelegatingPasswordEncoder.java:233)
+    at org.springframework.security.crypto.password.DelegatingPasswordEncoder.matches(DelegatingPasswordEncoder.java:196)
+```
+
+이 에러를 해결하는 가장 쉬운 방법은 Password 를 인코딩 할 PasswordEncoder 를 명시적으로 제공하는 것 이다.  
+저장소에 저장된 Password 가 어떤 형식으로 저장되어 있는지 확인하고 올바른 PasswordEncoder 를 할당하는 것이다.
+
+만약에 Spring Security 4.2.x 버전에서 최신버전으로 올라왔다면, 이전에는 기본 PasswordEncoder 가 
+NoOpPasswordEncoder 였으니까 이것을 기본 PasswordEncoder 로 활용하면 된다.
+
+아니면 기존의 평문으로 저장되어 있던 Password 를 원하는 id 의 암호화 알고리즘을 사용해서 암호화 한 후  
+해당 암호화의 id 를 prefix 를 붙여서 비밀번호를 업데이트 한 후 DelegatingPasswordEncoder 를 사용할 수 도 있다.
+  
+예를들어 기존에 평문으로 저장되어 있는 Password 를 아래와 같이 BCrypt 로 암호화 하고,
+```
+$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
+```
+
+Bcrypt 로 암호화 했으니 아래와 같이 prefix 를 붙여주면 된다.
+```
+{bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG
+```
+
+# 10. BCryptPasswordEncoder
+
+ 
+
+
+
+
+

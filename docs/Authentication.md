@@ -302,10 +302,45 @@ Bcrypt 로 암호화 했으니 아래와 같이 prefix 를 붙여주면 된다.
 ```
 
 # 10. BCryptPasswordEncoder
+BCryptPasswordEncoder 는 Password 를 해싱하기 위해 널리 사용되는 bcrypt 알고리즘을 사용했다.  
+Password 해독에 맞서기 위해 bcrypt 는 의도적으로 느리게 작동한다. 다른 Adaptive 단방향 메서드들 처럼  
+우리의 시스템에서 Password 를 검증하는데 약 1초의 시간이 걸리도록 조정되어 있어야한다.  
 
- 
+BcryptPasswordEncoder 는 기본적으로 javadoc 의 [**BcryptPasswordEncoder**](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/crypto/bcrypt/BCryptPasswordEncoder.html) 에 언급되어 있는  
+강도 10을 사용한다. 개발자에게 자신의 시스템에서 Password 를 검증하는데 대략 1초가 걸리도록 Strength 파라미터를 테스트하고 조정하도록  
+권장하고 있다. 
+
+* BcryptPasswordEncoder  
+```
+// Create an encoder with strength 16
+BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(16);
+String result = encoder.encode("myPassword");
+assertTrue(encoder.matches("myPassword", result));
+```
+
+위의 코드에서는 강도를 16으로 설정했으나 자신의 시스템에서 강도를 조정하면서 약 1초가 걸리도록 테스트 해보고  
+적합한 강도를 찾아야한다.
+
+```
+@Test
+	void testBcryptPasswordEncoderSuitableStrengthParameter() {
+
+		LocalDateTime startTime = LocalDateTime.now();
+		LocalDateTime expectedEndTime = startTime.plusSeconds(1);
+
+		BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder(14);
+		String encodedPassword = bCryptPasswordEncoder.encode("myPassword");
+		
+		assertTrue(bCryptPasswordEncoder.matches("myPassword", encodedPassword));
+		assertTrue(LocalDateTime.now().isAfter(expectedEndTime));
+
+	}
+```
+
+나는 위와 같이 Test 를 해서 내 PC 에서 약 1초의 시간이 걸리는 Strength 를 찾아보았다.  
+(참고로 이코드엔 빠져있지만 Encoding 된 Password 가 매번 다른 값으로 해싱되는지도 확인했다.)
 
 
+  
 
-
-
+# 11. Argon2PasswordEncoder

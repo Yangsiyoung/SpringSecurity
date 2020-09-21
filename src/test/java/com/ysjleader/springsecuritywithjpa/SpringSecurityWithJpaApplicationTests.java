@@ -2,6 +2,7 @@ package com.ysjleader.springsecuritywithjpa;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,13 @@ class SpringSecurityWithJpaApplicationTests {
 		assertTrue(bCryptPasswordEncoder.matches("myPassword", encodedPassword));
 		assertTrue(LocalDateTime.now().isAfter(expectedEndTime));
 
+	}
+
+	@Test
+	void testArgon2PasswordEncoder() {
+		Argon2PasswordEncoder argon2PasswordEncoder = new Argon2PasswordEncoder();
+		String encodedPassword = argon2PasswordEncoder.encode("myPassword");
+		assertTrue(argon2PasswordEncoder.matches("myPassword", encodedPassword));
 	}
 
 }

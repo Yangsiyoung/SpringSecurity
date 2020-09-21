@@ -307,8 +307,8 @@ Password 해독에 맞서기 위해 bcrypt 는 의도적으로 느리게 작동�
 우리의 시스템에서 Password 를 검증하는데 약 1초의 시간이 걸리도록 조정되어 있어야한다.  
 
 BcryptPasswordEncoder 는 기본적으로 javadoc 의 [**BcryptPasswordEncoder**](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/crypto/bcrypt/BCryptPasswordEncoder.html) 에 언급되어 있는  
-강도 10을 사용한다. 개발자에게 자신의 시스템에서 Password 를 검증하는데 대략 1초가 걸리도록 Strength 파라미터를 테스트하고 조정하도록  
-권장하고 있다. 
+강도 10을 사용한다. 개발자에게 자신의 시스템에서 Password 를 검증하는데 대략 1초가 걸리도록 Strength 파라미터를    
+테스트하고 조정하도록 권장하고 있다. 
 
 * BcryptPasswordEncoder  
 ```
@@ -344,3 +344,85 @@ assertTrue(encoder.matches("myPassword", result));
   
 
 # 11. Argon2PasswordEncoder
+Argon2PasswordEncoder 는 Password 해싱을 위해 Argon2 알고리즘을 사용했다.  
+Argon2 은 [**Password Hashing 대회**](https://en.wikipedia.org/wiki/Password_Hashing_Competition) 에서 우승을 차지한 알고리즘이다.  
+
+커스텀한 하드웨어에서 Password 해독을 무력화 하기위해, Argon2 은 의도적으로  
+많은 메모리를 요구하는 느린 알고리즘이다. 다른 Adaptive 단방향 함수와 같이 우리의 시스템에서  
+Password 검증이 약 1초가 걸리도록 조절을 하자.  
+
+현재 버전의 Argon2PasswordEncoder 는 BouncyCastle 을 필요로한다.  
+(BouncyCastle 관련 디펜던시를 추가해줘야한다는 뜻)
+
+* BouncyCastle Dependency
+
+```
+implementation 'org.bouncycastle:bcprov-jdk15on:1.64'
+``` 
+
+* Argon2PasswordEncoder  
+
+```
+// Create an encoder with all the defaults
+Argon2PasswordEncoder encoder = new Argon2PasswordEncoder();
+String result = encoder.encode("myPassword");
+assertTrue(encoder.matches("myPassword", result));
+```
+
+# 12. Pbkdf2PasswordEncoder
+Pbkdf2PasswordEncoder 는 Password 를 해싱하기 위해 PBKD2 알고리즘을 사용했다.  
+위의 다른 PasswordEncoder 처럼 의도록적으로 느리게 작동하고, 다른 adaptive 단방향 함수처럼  
+자신의 시스템에서 약 1초의 시간이 걸리도록 설정을 하는 것이 좋다.  
+이 알고리즘은 FIPS 인증이 필요할 때 사용하면 좋다.  
+(FIPS 가 몰까?? 나중에 찾아서 정리해보쟈)
+
+* Pbkdf2PasswordEncoder
+
+```
+// Create an encoder with all the defaults
+Pbkdf2PasswordEncoder encoder = new Pbkdf2PasswordEncoder();
+String result = encoder.encode("myPassword");
+assertTrue(encoder.matches("myPassword", result));
+```
+
+# 13. SCryptPasswordEncoder
+SCryptPasswordEncoder 는 Password 를 해싱하기 위해 scrypt 알고리즘을 사용했다.
+Argon2 알고리즘 처럼 scrypt 도 커스텀 하드웨어에서 Password 해독을 무력화하기 위해,  
+의도적으로 상당한 메모리를 요구한다. 다른 Adaptive 단방향 암호화 함수들 처럼  
+Password 를 검증하는데 약 1초가 소요되도록 조절을 해야한다.  
+
+* SCryptPasswordEncoder  
+
+```
+// Create an encoder with all the defaults
+SCryptPasswordEncoder encoder = new SCryptPasswordEncoder();
+String result = encoder.encode("myPassword");
+assertTrue(encoder.matches("myPassword", result));
+```   
+
+# 14. Other PasswordEncoders
+이전 버전과의 호환성을 위해 존재하는 상당히 많은 수 의 PasswordEncoder 구현체들이 있다.  
+더이상 안전하지 않다고 여겨지기 때문에 사용하지 않도록 권장되고있다. 하지만 기존의 레거시 시스템에서  
+새로운 알고리즘으로 마이그레이션 하는 것은 어렵기 때문에 안전하지 않은 알고리즘을 구현한   
+PasswordEncoder 라도 지원을 하고있다. 
+
+# 15. Password Storage Configuration
+Spring Security 는 기본적으로 DelegatingPasswordEncoder 를 사용하고 있다.  
+하지만 다른 PasswordEncoder 를 빈으로 등록 함으로써 기본 PasswordEncoder 를 변경할 수 있다.  
+
+만약에 Spring Security 4.2.x 버전으로 부터 현재버전으로 마이그레이션을 하고자 한다면,  
+NoOpPasswordEncoder 를 빈으로 등록하여 이전에 저장된 Password 들과의 호환성을  
+유지할 수 있다.
+
+하지만 NoOpPasswordEncoder 를 사용하는 것은 안전하지 않기때문에 DelegatingPasswordEncoder 를  
+사용하는 것이 좋을 것 같다...
+
+* Exposing NoOpPasswordEncoder Bean
+
+```
+@Bean
+public static NoOpPasswordEncoder passwordEncoder() {
+    return NoOpPasswordEncoder.getInstance();
+}
+```
+

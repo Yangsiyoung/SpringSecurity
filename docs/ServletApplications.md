@@ -63,3 +63,66 @@ Spring Boot 는 많은 설정을 하지 않지만 많은 기능을 제공한다.
     * [**HttpServletRequest.html#logout()**](https://docs.oracle.com/javaee/6/api/javax/servlet/http/HttpServletRequest.html#logout())
 
 # Servlet Security: The Big Picture
+이번 장에서는 Servlet 기반의 Application 에서의 Spring Security 의 고수준 아키텍쳐를 설명한다.  
+이 장에서는 [**인증**](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#servlet-authentication), [**인가**](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#servlet-authorization), [**악용 방지**](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#servlet-exploits) 섹션에 대한 높은 이해도를 바탕으로 풀어나간다.  
+
+## A Review of Filters
+Spring Security 의 Servlet 지원은 Servlet Filter 를 기반으로 한다.  
+Filter 의 역할을 우선적으로 살펴보는 것이 도움이 될 것 이다.  
+아래의 그림은 HTTP Request 에 대한 처리를 계층적으로 보여준다.  
+
+<img width="258" alt="Security FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/filterchain.png">  
+
+Client 는 Application 에 Request 를 보낸다, 그리고 컨테이너는 Request URI 에 기반한 HttpServletRequest 를  
+처리하기 위해 Servlet 과 Filter 를 포함하는 FilterChain 을 생성한다.  
+Spring MVC Application 에서 Servlet 은 DispatcherServlet 의 Instance 이다.  
+하나의 Servlet 이 하나의 HttpServletRequest 와 HttpServletResponse 를 처리한다.  
+하지만 두개 이상의 Filter 를 사용하여 아래의 역할을 한다.  
+
+* downstream Filter 혹은 서블릿 호출되지 않도록 방지한다. 이 인스턴스에서는  
+Filter 는 일반적으로 HttpServletResponse 를 만든다.      
+
+* downstream Filter 그리고 Servlet 에 사용되는 HttpServletRequest 나 HttpServletResponse 를  
+수정한다.  
+
+Filter 의 힘은 전달된 FilterChain 을 통해 나온다.  
+
+* FilterChain Usage Example  
+```
+public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
+    // do something before the rest of the application
+    chain.doFilter(request, response); // invoke the rest of the application
+    // do something after the rest of the application
+}
+```
+
+Filter 의 downstream Filter 와 Servlet 에만 끼치는 영향력 때문에,  
+각 Filter 의 순서는 아주 중요하다.  
+
+## DelegatingFilterProxy
+Spring Security 는 Servlet 컨테이너의 라이프 사이클과 Spring 의 ApplicationContext 의 연결고리 역할을 하는  
+DelegatingFilterProxy 라는 이름의 Filter 를 제공한다.  
+Servlet 컨테이너는 Servlet 의 표준을 따르는 Filter 를 등록하는 것을 허용하지만,  
+Spring 에서 정의된 Bean 을 알지못한다.  
+DelegatingFilterProxy 는 Servlet 컨테이너의 메카니즘을 활용하여 등록된다,  
+그러나 모든 역할을 Filter 를 구현한 Spring Bean 에게 위임한다. 
+
+아래의 그림은 Filter 와 FilterChain 에 어떻게 DelegatingFilterProxy 가 적용되어있는지 나타낸다.  
+<img width="258" alt="DelegatingFilterProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/delegatingfilterproxy.png">  
+
+DelegatingFilterProxy 는 ApplicationContext 에 존재하는 Bean Filter0 을 바라보고,  
+BeanFilter0 를 호출한다.  
+
+아래의 코드는 DelegatingFilterProxy 의 슈도코드이다.  
+
+* DelegatingFilterProxy Pseudo Code
+```
+public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
+    // Lazily get Filter that was registered as a Spring Bean
+    // For the example in DelegatingFilterProxy delegate is an instance of Bean Filter0
+    Filter delegate = getFilterBean(someBeanName);
+    // delegate work to the Spring Bean
+    delegate.doFilter(request, response);
+}
+```
+

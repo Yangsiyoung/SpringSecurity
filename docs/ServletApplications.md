@@ -126,3 +126,31 @@ public void doFilter(ServletRequest request, ServletResponse response, FilterCha
 }
 ```
 
+또다른 DelegatingFilterProxy 의 장점은 Filter Bean 인스턴스를 바라보는 것을  
+늦출 수 있다는 점이다. 이 것이 중요한 이유는 컨테이너는 컨테이너가 시작되기 전에 Filter 인스턴스를  
+등록해야하기 때문이다. 하지만 Spring 은 일반적으로 ContextLoaderListener 를 사용하고,  
+이 ContextLoaderListener 를 사용하여 Spring Bean 들을 등록한다.  
+그리고 Spring Bean 들은 Filter 인스턴스를 등록해야할 때 까지 등록되지 않는다.  
+다시말해, DelegatingFilterProxy 는 컨테이너가 시작될떄 등록되고,  
+이후에 Spring Bean 들이 로드되고 DelegatingFilterProxy 코드 내에서  
+Spring Bean 들을 사용하므로 Spring Bean 이 컨테이너의 시작보다 늦게 로드되도 이상없도록  
+해주기때문에 장점이 있다는 것 이다.  
+
+## FilterChainProxy
+Spring Security 는 FilterChainProxy 를 포함한다.  
+FilterChainProxy 는 Spring Security 가 제공하는 특별한 Filter 이다.  
+SecurityFilterChain 을 통해서 많은 Filter Instance 에 기능을 위임할 수 있다.  
+FilterChainProxy 가 Bean 이기 때문에, 일반적으로 DelegatingFilterProxy 내부에 있다.  
+
+<img width="258" alt="FilterChainProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/filterchainproxy.png">
+ 
+## SecurityFilterChain
+SecurityFilterChain 은 FilterChainProxy 로 부터 사용되며,  
+어떤 Spring Security Filter 를 Request 를 처리하기 위해 사용해야하는지  
+결정하는 역할을 한다.
+
+<img width="258" alt="FilterChainProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/securityfilterchain.png">
+
+SecurityFilterChain 내부에 있는 Security Filter 들은 일반적으로 Bean 이다.  
+하지만 이 Security Filter 들은 DelegatingFilterProxy 말고 FilterChainProxy 에 등록되어 있다.  
+  

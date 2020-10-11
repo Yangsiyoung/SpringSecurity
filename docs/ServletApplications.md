@@ -108,6 +108,7 @@ DelegatingFilterProxy 는 Servlet 컨테이너의 메카니즘을 활용하여 �
 그러나 모든 역할을 Filter 를 구현한 Spring Bean 에게 위임한다. 
 
 아래의 그림은 Filter 와 FilterChain 에 어떻게 DelegatingFilterProxy 가 적용되어있는지 나타낸다.  
+
 <img width="258" alt="DelegatingFilterProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/delegatingfilterproxy.png">  
 
 DelegatingFilterProxy 는 ApplicationContext 에 존재하는 Bean Filter0 을 바라보고,  
@@ -142,15 +143,48 @@ FilterChainProxy 는 Spring Security 가 제공하는 특별한 Filter 이다.
 SecurityFilterChain 을 통해서 많은 Filter Instance 에 기능을 위임할 수 있다.  
 FilterChainProxy 가 Bean 이기 때문에, 일반적으로 DelegatingFilterProxy 내부에 있다.  
 
-<img width="258" alt="FilterChainProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/filterchainproxy.png">
+<img width="258" alt="FilterChainProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/filterchainproxy.png">  
  
 ## SecurityFilterChain
 SecurityFilterChain 은 FilterChainProxy 로 부터 사용되며,  
 어떤 Spring Security Filter 를 Request 를 처리하기 위해 사용해야하는지  
 결정하는 역할을 한다.
 
-<img width="258" alt="FilterChainProxy in FilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/securityfilterchain.png">
+<img width="258" alt="SecurityFilterChain" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/securityfilterchain.png">
 
 SecurityFilterChain 내부에 있는 Security Filter 들은 일반적으로 Bean 이다.  
 하지만 이 Security Filter 들은 DelegatingFilterProxy 말고 FilterChainProxy 에 등록되어 있다.  
-  
+FilterChainProxy 는 Servlet 컨테이너나 DelegatingFilterProxy 에 바로 등록될 때  
+많은 이점이 있다.  
+
+첫번째로 FilterChainProxy 는 Spring Security 가 Servlet 를 지원하는 시작점이 된다.  
+이러한 이유로 우리가 Spring Security 의 Servlet 기능에 대해 트러블 슈팅할 때,  
+FilterChainProxy 는 좋은 디버그 포인트가 된다.  
+
+두번째로, FilterChainProxy 는 Spring Security 사용에 대한 중심점이기 때문에,  
+선택 사항으로 여겨지지않는 작업을 수행할 수 있다.  
+예를들어 FilterChainProxy 는 메모리 누수를 방지하기 위해 Security Context 를 비울 수 있다.  
+또한 특정 유형의 공격을 방어하기 위해 Spring Security 의 [**HttpFirewall**](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#servlet-httpfirewall) 을 적용할 수 있다.  
+
+추가적으로 FilterChainProxy 는 SecurityFilterChain 이 언제 수행될지에 대한 유연성을 제공한다.  
+Servlet 컨테이너에서, Filter 는 URL 에 따라 호출되어 진다.  
+하지만 FilterChainProxy 는 RequestMatcher 의 이점을 활용하여 HttpServletRequest 의 모든 항목에 대해서  
+호출여부를 판단할 수 있다.  
+
+사실 FilterChainProxy 는 어떤 SecurityFilterChain 이 호출되어야 하는지 결정할 때 사용될 수 있다.  
+이를통해 우리의 Application 의 다른 각각의 부분들에 대한 별도의 설정을 제공할 수 있다.  
+
+<img width="258" alt="FilterChainProxyWithSeparatedConfiguration" src="https://docs.spring.io/spring-security/site/docs/current/reference/html5/images/servlet/architecture/multi-securityfilterchain.png">  
+
+다중 SecurityFilterChain 구성에서, FilterChainProxy 는 어떤 SecurityFilterChain 이 사용될지 결정한다.  
+일치하는 첫번째 SecurityFilterChain 만 실행된다. 만약 위 사진의 구조에서 /api/messages/ 라는 URL 이 요청되면,  
+SecurityFilterChain0 가 첫번째로 일치하는 패턴일 것 이고, 따라서 SecurityFilterChain n 또한 일치하는 패턴임에도  
+SecurityFilterChain0 만 호출되어 수행될 것 이다.  
+
+만약 /messages/ 라는 URL 이 요청되면 /api/** 패턴을 가지는 SecurityFilterChain0 는 일치하지 않으며,  
+그래서 FilterChainProxy 는 각각의 SecurityFilterChain 을 찾으며 일치하는 패턴의 SecurityFilterChain 을  
+수행할 것 이다.  
+
+일치하는 패턴이 없다고 가정하면, SecurityFilterChain n 이 수행될 것 이다.  
+
+
